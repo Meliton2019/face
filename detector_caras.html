@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FACE SCAN // GAMEOVERDELUXE2</title>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --yellow: #CCFF00;
+    --black: #0a0a0a;
+    --dark: #111111;
+    --mid: #1a1a1a;
+    --dim: #2a2a2a;
+    --red: #FF2D55;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--yellow);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  header {
+    width: 100%;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--dim);
+  }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 1rem;
+    letter-spacing: 0.15em;
+    color: var(--yellow);
+  }
+
+  .logo span { color: #444; }
+
+  #status-bar {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: #555;
+    display: flex;
+    gap: 20px;
+  }
+
+  #status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #333;
+    margin-right: 6px;
+    transition: background 0.3s;
+  }
+  #status-dot.active { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  #status-dot.error { background: var(--red); }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  #scan-container {
+    position: relative;
+    width: 100%;
+    max-width: 720px;
+    aspect-ratio: 4/3;
+    background: var(--dark);
+    border: 1px solid var(--dim);
+    overflow: hidden;
+  }
+
+  /* Corner decorations */
+  #scan-container::before,
+  #scan-container::after {
+    content: '';
+    position: absolute;
+    width: 24px; height: 24px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  #scan-container::before {
+    top: 0; left: 0;
+    border-top: 2px solid var(--yellow);
+    border-left: 2px solid var(--yellow);
+  }
+  #scan-container::after {
+    bottom: 0; right: 0;
+    border-bottom: 2px solid var(--yellow);
+    border-right: 2px solid var(--yellow);
+  }
+
+  .corner-tr, .corner-bl {
+    position: absolute;
+    width: 24px; height: 24px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .corner-tr { top: 0; right: 0; border-top: 2px solid var(--yellow); border-right: 2px solid var(--yellow); }
+  .corner-bl { bottom: 0; left: 0; border-bottom: 2px solid var(--yellow); border-left: 2px solid var(--yellow); }
+
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transform: scaleX(-1); /* espejo */
+  }
+
+  #overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform: scaleX(-1); /* espejo igual que video */
+    pointer-events: none;
+  }
+
+  /* Scanline effect */
+  #scan-container::before {
+    top: 0; left: 0;
+    border-top: 2px solid var(--yellow);
+    border-left: 2px solid var(--yellow);
+  }
+
+  .scanline {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 2px;
+    background: linear-gradient(transparent, var(--yellow), transparent);
+    opacity: 0.15;
+    animation: scan 3s linear infinite;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  @keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+
+  #placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #333;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+  }
+
+  #placeholder svg { opacity: 0.2; }
+
+  #start-btn {
+    margin-top: 24px;
+    padding: 14px 40px;
+    background: transparent;
+    border: 1px solid var(--yellow);
+    color: var(--yellow);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    text-transform: uppercase;
+  }
+
+  #start-btn:hover {
+    background: var(--yellow);
+    color: var(--black);
+    box-shadow: 0 0 20px rgba(204,255,0,0.3);
+  }
+
+  #start-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: transparent;
+    color: var(--yellow);
+    box-shadow: none;
+  }
+
+  #stats {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 720px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--dim);
+    border: 1px solid var(--dim);
+  }
+
+  .stat {
+    background: var(--dark);
+    padding: 14px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: #444;
+    text-transform: uppercase;
+  }
+
+  .stat-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--yellow);
+    line-height: 1;
+  }
+
+  #log {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 720px;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    color: #333;
+    line-height: 1.8;
+    height: 60px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column-reverse;
+  }
+
+  .log-line { transition: color 0.5s; }
+  .log-line.new { color: var(--yellow); }
+  .log-line.warn { color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GAMEOVERDELUXE<span>2</span></div>
+  <div id="status-bar">
+    <span><span id="status-dot"></span><span id="status-text">OFFLINE</span></span>
+  </div>
+</header>
+
+<main>
+  <div id="scan-container">
+    <div class="corner-tr"></div>
+    <div class="corner-bl"></div>
+    <div class="scanline"></div>
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay"></canvas>
+    <div id="placeholder">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="46" height="46" rx="2" stroke="#CCFF00" stroke-width="1.5"/>
+        <circle cx="24" cy="20" r="8" stroke="#CCFF00" stroke-width="1.5"/>
+        <path d="M8 44c0-8.837 7.163-16 16-16s16 7.163 16 16" stroke="#CCFF00" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span id="placeholder-text">INICIALIZAR CÁMARA</span>
+    </div>
+  </div>
+
+  <button id="start-btn" onclick="startDetection()">▶ INICIAR SCAN</button>
+
+  <div id="stats">
+    <div class="stat">
+      <span class="stat-label">Caras detectadas</span>
+      <span class="stat-value" id="face-count">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Confianza máx.</span>
+      <span class="stat-value" id="confidence">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">FPS</span>
+      <span class="stat-value" id="fps-display">—</span>
+    </div>
+  </div>
+
+  <div id="log">
+    <div class="log-line">> SISTEMA LISTO. ESPERANDO INICIO.</div>
+  </div>
+</main>
+
+<script>
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('overlay');
+  const ctx = canvas.getContext('2d');
+  const placeholder = document.getElementById('placeholder');
+  const startBtn = document.getElementById('start-btn');
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const faceCount = document.getElementById('face-count');
+  const confidenceEl = document.getElementById('confidence');
+  const fpsDisplay = document.getElementById('fps-display');
+  const logEl = document.getElementById('log');
+
+  let running = false;
+  let lastTime = 0;
+  let frameCount = 0;
+  let fps = 0;
+
+  function addLog(msg, type = '') {
+    const line = document.createElement('div');
+    line.className = 'log-line new' + (type ? ' ' + type : '');
+    line.textContent = '> ' + msg;
+    logEl.prepend(line);
+    setTimeout(() => line.classList.remove('new'), 800);
+    while (logEl.children.length > 5) logEl.removeChild(logEl.lastChild);
+  }
+
+  function setStatus(state, text) {
+    statusDot.className = state;
+    statusText.textContent = text;
+  }
+
+  async function startDetection() {
+    startBtn.disabled = true;
+    addLog('Cargando modelos de detección...');
+    setStatus('', 'CARGANDO');
+
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      addLog('Modelo cargado. Accediendo a cámara...');
+    } catch (e) {
+      addLog('Error al cargar modelos: ' + e.message, 'warn');
+      setStatus('error', 'ERROR');
+      startBtn.disabled = false;
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      video.srcObject = stream;
+      await new Promise(r => video.onloadedmetadata = r);
+
+      placeholder.style.display = 'none';
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      addLog('Cámara activa. Iniciando detección...');
+      setStatus('active', 'LIVE');
+      running = true;
+      detect();
+    } catch (e) {
+      addLog('Error de cámara: ' + e.message, 'warn');
+      setStatus('error', 'ERROR');
+      startBtn.disabled = false;
+    }
+  }
+
+  async function detect() {
+    if (!running) return;
+
+    const now = performance.now();
+    frameCount++;
+    if (now - lastTime >= 1000) {
+      fps = frameCount;
+      frameCount = 0;
+      lastTime = now;
+      fpsDisplay.textContent = fps;
+    }
+
+    const detections = await faceapi.detectAllFaces(
+      video,
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+    );
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    faceCount.textContent = detections.length;
+
+    let maxConf = 0;
+    detections.forEach(det => {
+      const { x, y, width, height } = det.box;
+      const score = det.score;
+      if (score > maxConf) maxConf = score;
+
+      // Rectángulo principal
+      ctx.strokeStyle = '#CCFF00';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, width, height);
+
+      // Esquinas decorativas
+      const cs = 16; // corner size
+      ctx.strokeStyle = '#CCFF00';
+      ctx.lineWidth = 3;
+      // top-left
+      ctx.beginPath(); ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y); ctx.stroke();
+      // top-right
+      ctx.beginPath(); ctx.moveTo(x + width - cs, y); ctx.lineTo(x + width, y); ctx.lineTo(x + width, y + cs); ctx.stroke();
+      // bottom-left
+      ctx.beginPath(); ctx.moveTo(x, y + height - cs); ctx.lineTo(x, y + height); ctx.lineTo(x + cs, y + height); ctx.stroke();
+      // bottom-right
+      ctx.beginPath(); ctx.moveTo(x + width - cs, y + height); ctx.lineTo(x + width, y + height); ctx.lineTo(x + width, y + height - cs); ctx.stroke();
+
+      // Label
+      const label = `${Math.round(score * 100)}%`;
+      ctx.fillStyle = '#CCFF00';
+      ctx.font = '11px "Share Tech Mono", monospace';
+      ctx.fillText('CARA ' + label, x + 4, y - 6);
+    });
+
+    if (maxConf > 0) confidenceEl.textContent = Math.round(maxConf * 100) + '%';
+    else confidenceEl.textContent = '—';
+
+    requestAnimationFrame(detect);
+  }
+</script>
+</body>
+</html>
