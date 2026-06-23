@@ -338,7 +338,7 @@
     addLog('Cargando modelos de detección...');
     setStatus('', 'CARGANDO');
 
-    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+    const MODEL_URL = './model';
 
     try {
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
