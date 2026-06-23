@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FACE SCAN // GAMEOVERDELUXE2</title>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --yellow: #CCFF00;
+    --black: #0a0a0a;
+    --dark: #111111;
+    --dim: #2a2a2a;
+    --red: #FF2D55;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--yellow);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  header {
+    width: 100%;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--dim);
+  }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 1rem;
+    letter-spacing: 0.15em;
+    color: var(--yellow);
+  }
+  .logo span { color: #444; }
+
+  #status-bar { font-size: 0.7rem; letter-spacing: 0.1em; color: #555; }
+
+  #status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #333;
+    margin-right: 6px;
+    transition: background 0.3s;
+  }
+  #status-dot.active { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  #status-dot.error  { background: var(--red); }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  /* ── MODE TABS ── */
+  #mode-tabs {
+    display: flex;
+    width: 100%;
+    max-width: 720px;
+    margin-bottom: 0;
+    border: 1px solid var(--dim);
+    border-bottom: none;
+  }
+  .tab {
+    flex: 1;
+    padding: 12px;
+    background: var(--dark);
+    border: none;
+    border-right: 1px solid var(--dim);
+    color: #444;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+  }
+  .tab:last-child { border-right: none; }
+  .tab:hover { color: #888; }
+  .tab.active { color: var(--yellow); background: #0f0f0f; border-bottom: 2px solid var(--yellow); }
+
+  /* ── SCAN CONTAINER ── */
+  #scan-container {
+    position: relative;
+    width: 100%;
+    max-width: 720px;
+    aspect-ratio: 4/3;
+    background: var(--dark);
+    border: 1px solid var(--dim);
+    overflow: hidden;
+  }
+  #scan-container::before {
+    content: ''; position: absolute; top: 0; left: 0;
+    width: 24px; height: 24px; z-index: 10; pointer-events: none;
+    border-top: 2px solid var(--yellow); border-left: 2px solid var(--yellow);
+  }
+  #scan-container::after {
+    content: ''; position: absolute; bottom: 0; right: 0;
+    width: 24px; height: 24px; z-index: 10; pointer-events: none;
+    border-bottom: 2px solid var(--yellow); border-right: 2px solid var(--yellow);
+  }
+  .corner-tr { position: absolute; top: 0; right: 0; width: 24px; height: 24px; z-index: 10; pointer-events: none; border-top: 2px solid var(--yellow); border-right: 2px solid var(--yellow); }
+  .corner-bl { position: absolute; bottom: 0; left: 0; width: 24px; height: 24px; z-index: 10; pointer-events: none; border-bottom: 2px solid var(--yellow); border-left: 2px solid var(--yellow); }
+
+  #cam-video {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+    transform: scaleX(-1);
+  }
+  #vid-player {
+    width: 100%; height: 100%;
+    object-fit: contain; display: none;
+    background: #000;
+  }
+  #photo-img {
+    width: 100%; height: 100%;
+    object-fit: contain; display: none;
+  }
+  #overlay {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .scanline {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 2px;
+    background: linear-gradient(transparent, var(--yellow), transparent);
+    opacity: 0.15;
+    animation: scanmove 3s linear infinite;
+    pointer-events: none; z-index: 5;
+  }
+  @keyframes scanmove { 0% { top: 0; } 100% { top: 100%; } }
+
+  #placeholder {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; color: #333; font-size: 0.8rem; letter-spacing: 0.1em;
+  }
+  #placeholder svg { opacity: 0.2; }
+
+  /* ── CONTROLS ── */
+  #controls {
+    margin-top: 16px;
+    width: 100%; max-width: 720px;
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 12px 24px;
+    background: transparent;
+    border: 1px solid var(--yellow);
+    color: var(--yellow);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700; font-size: 0.75rem;
+    letter-spacing: 0.15em; cursor: pointer;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .btn:hover { background: var(--yellow); color: var(--black); box-shadow: 0 0 20px rgba(204,255,0,0.3); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; background: transparent; color: var(--yellow); box-shadow: none; }
+  .btn.secondary { border-color: #444; color: #444; }
+  .btn.secondary:hover { background: #444; color: var(--black); box-shadow: none; }
+
+  /* hidden file inputs */
+  #photo-input, #video-input { display: none; }
+
+  /* ── THRESHOLD ── */
+  #threshold-control {
+    margin-top: 16px; width: 100%; max-width: 720px;
+    background: var(--dark); border: 1px solid var(--dim); padding: 14px 20px;
+  }
+  #threshold-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  #threshold-value { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--yellow); }
+  #threshold-slider {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 2px; background: var(--dim); outline: none; cursor: pointer;
+  }
+  #threshold-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; background: var(--yellow);
+    cursor: pointer; border-radius: 0; box-shadow: 0 0 8px rgba(204,255,0,0.5);
+  }
+  #threshold-hints { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.6rem; color: #444; letter-spacing: 0.05em; }
+
+  /* ── STATS ── */
+  #stats {
+    margin-top: 16px; width: 100%; max-width: 720px;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: var(--dim); border: 1px solid var(--dim);
+  }
+  .stat { background: var(--dark); padding: 14px 20px; display: flex; flex-direction: column; gap: 4px; }
+  .stat-label { font-size: 0.6rem; letter-spacing: 0.15em; color: #444; text-transform: uppercase; }
+  .stat-value { font-family: 'Orbitron', sans-serif; font-size: 1.4rem; font-weight: 700; color: var(--yellow); line-height: 1; }
+
+  /* ── VIDEO PROGRESS ── */
+  #video-progress-wrap {
+    display: none;
+    margin-top: 10px; width: 100%; max-width: 720px;
+    background: var(--dark); border: 1px solid var(--dim); padding: 12px 20px;
+  }
+  #video-progress-label { font-size: 0.65rem; color: #555; letter-spacing: 0.1em; margin-bottom: 8px; }
+  #video-progress-bar-bg { width: 100%; height: 4px; background: var(--dim); }
+  #video-progress-bar { height: 4px; background: var(--yellow); width: 0%; transition: width 0.3s; }
+
+  /* ── LOG ── */
+  #log {
+    margin-top: 16px; width: 100%; max-width: 720px;
+    font-size: 0.65rem; letter-spacing: 0.08em; color: #333;
+    line-height: 1.8; height: 60px; overflow: hidden;
+    display: flex; flex-direction: column-reverse;
+  }
+  .log-line { transition: color 0.5s; }
+  .log-line.new  { color: var(--yellow); }
+  .log-line.warn { color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GAMEOVERDELUXE<span>2</span></div>
+  <div id="status-bar">
+    <span><span id="status-dot"></span><span id="status-text">OFFLINE</span></span>
+  </div>
+</header>
+
+<main>
+  <!-- TABS -->
+  <div id="mode-tabs">
+    <button class="tab active" onclick="switchMode('cam')">📷 CÁMARA</button>
+    <button class="tab" onclick="switchMode('photo')">🖼 FOTO</button>
+    <button class="tab" onclick="switchMode('video')">🎬 VÍDEO</button>
+  </div>
+
+  <!-- VIEWER -->
+  <div id="scan-container">
+    <div class="corner-tr"></div>
+    <div class="corner-bl"></div>
+    <div class="scanline"></div>
+    <video id="cam-video" autoplay muted playsinline></video>
+    <video id="vid-player" muted playsinline></video>
+    <img id="photo-img" alt="foto cargada"/>
+    <canvas id="overlay"></canvas>
+    <div id="placeholder">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect x="1" y="1" width="46" height="46" rx="2" stroke="#CCFF00" stroke-width="1.5"/>
+        <circle cx="24" cy="20" r="8" stroke="#CCFF00" stroke-width="1.5"/>
+        <path d="M8 44c0-8.837 7.163-16 16-16s16 7.163 16 16" stroke="#CCFF00" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span id="placeholder-text">INICIALIZAR CÁMARA</span>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div id="controls">
+    <button class="btn" id="cam-btn" onclick="startCamera()">▶ INICIAR SCAN</button>
+    <button class="btn secondary" id="photo-btn" onclick="document.getElementById('photo-input').click()" style="display:none">📂 SUBIR FOTO</button>
+    <button class="btn secondary" id="video-btn" onclick="document.getElementById('video-input').click()" style="display:none">📂 SUBIR VÍDEO</button>
+    <button class="btn secondary" id="video-play-btn" onclick="runVideoDetection()" style="display:none">▶ ANALIZAR VÍDEO</button>
+  </div>
+
+  <input type="file" id="photo-input" accept="image/*" onchange="loadPhoto(event)">
+  <input type="file" id="video-input" accept="video/*" onchange="loadVideo(event)">
+
+  <!-- THRESHOLD -->
+  <div id="threshold-control">
+    <div id="threshold-row">
+      <span class="stat-label">UMBRAL DE CONFIANZA</span>
+      <span id="threshold-value">0.50</span>
+    </div>
+    <input type="range" id="threshold-slider" min="0.05" max="0.95" step="0.05" value="0.50"
+      oninput="updateThreshold(this.value)">
+    <div id="threshold-hints">
+      <span>0.05 — detecta todo</span>
+      <span>0.50 — equilibrio</span>
+      <span>0.95 — muy estricto</span>
+    </div>
+  </div>
+
+  <!-- VIDEO PROGRESS -->
+  <div id="video-progress-wrap">
+    <div id="video-progress-label">ANALIZANDO VÍDEO... <span id="video-progress-pct">0%</span></div>
+    <div id="video-progress-bar-bg"><div id="video-progress-bar"></div></div>
+  </div>
+
+  <!-- STATS -->
+  <div id="stats">
+    <div class="stat">
+      <span class="stat-label">Caras detectadas</span>
+      <span class="stat-value" id="face-count">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Confianza máx.</span>
+      <span class="stat-value" id="confidence">—</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">FPS / Frames</span>
+      <span class="stat-value" id="fps-display">—</span>
+    </div>
+  </div>
+
+  <div id="log">
+    <div class="log-line">> SISTEMA LISTO. ELIGE UN MODO.</div>
+  </div>
+</main>
+
+<script>
+  const camVideo    = document.getElementById('cam-video');
+  const vidPlayer   = document.getElementById('vid-player');
+  const photoImg    = document.getElementById('photo-img');
+  const overlay     = document.getElementById('overlay');
+  const ctx         = overlay.getContext('2d');
+  const placeholder = document.getElementById('placeholder');
+  const statusDot   = document.getElementById('status-dot');
+  const statusText  = document.getElementById('status-text');
+  const faceCount   = document.getElementById('face-count');
+  const confidenceEl= document.getElementById('confidence');
+  const fpsDisplay  = document.getElementById('fps-display');
+  const logEl       = document.getElementById('log');
+
+  const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+
+  let mode = 'cam';           // 'cam' | 'photo' | 'video'
+  let camRunning = false;
+  let modelLoaded = false;
+  let currentThreshold = 0.5;
+  let lastTime = 0, frameCount = 0;
+
+  /* ── UTILS ── */
+  function addLog(msg, type = '') {
+    const line = document.createElement('div');
+    line.className = 'log-line new' + (type ? ' ' + type : '');
+    line.textContent = '> ' + msg;
+    logEl.prepend(line);
+    setTimeout(() => line.classList.remove('new'), 800);
+    while (logEl.children.length > 5) logEl.removeChild(logEl.lastChild);
+  }
+
+  function setStatus(state, text) {
+    statusDot.className = state;
+    statusText.textContent = text;
+  }
+
+  function updateThreshold(val) {
+    currentThreshold = parseFloat(val);
+    document.getElementById('threshold-value').textContent = currentThreshold.toFixed(2);
+    addLog('Umbral: ' + currentThreshold.toFixed(2));
+  }
+
+  function drawDetections(detections, scaleX, scaleY) {
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    let maxConf = 0;
+    detections.forEach(det => {
+      let { x, y, width, height } = det.box;
+      x *= scaleX; y *= scaleY;
+      width *= scaleX; height *= scaleY;
+      const score = det.score;
+      if (score > maxConf) maxConf = score;
+
+      ctx.strokeStyle = '#CCFF00';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, width, height);
+
+      const cs = 16;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + width - cs, y); ctx.lineTo(x + width, y); ctx.lineTo(x + width, y + cs); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, y + height - cs); ctx.lineTo(x, y + height); ctx.lineTo(x + cs, y + height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + width - cs, y + height); ctx.lineTo(x + width, y + height); ctx.lineTo(x + width, y + height - cs); ctx.stroke();
+
+      ctx.fillStyle = '#CCFF00';
+      ctx.font = '11px "Share Tech Mono", monospace';
+      ctx.fillText('CARA ' + Math.round(score * 100) + '%', x + 4, y - 6);
+    });
+    faceCount.textContent = detections.length;
+    confidenceEl.textContent = maxConf > 0 ? Math.round(maxConf * 100) + '%' : '—';
+  }
+
+  async function ensureModel() {
+    if (modelLoaded) return true;
+    addLog('Cargando modelo...');
+    setStatus('', 'CARGANDO');
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      modelLoaded = true;
+      addLog('Modelo listo.');
+      return true;
+    } catch(e) {
+      addLog('Error modelo: ' + e.message, 'warn');
+      setStatus('error', 'ERROR');
+      return false;
+    }
+  }
+
+  /* ── MODE SWITCH ── */
+  function switchMode(m) {
+    // stop camera if running
+    if (camRunning) {
+      camRunning = false;
+      if (camVideo.srcObject) camVideo.srcObject.getTracks().forEach(t => t.stop());
+      camVideo.srcObject = null;
+    }
+    vidPlayer.pause();
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    faceCount.textContent = '—';
+    confidenceEl.textContent = '—';
+    fpsDisplay.textContent = '—';
+
+    mode = m;
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', ['cam','photo','video'][i] === m));
+
+    camVideo.style.display   = m === 'cam'   ? 'block' : 'none';
+    vidPlayer.style.display  = m === 'video' ? 'block' : 'none';
+    photoImg.style.display   = m === 'photo' ? 'block' : 'none';
+
+    document.getElementById('cam-btn').style.display        = m === 'cam'   ? '' : 'none';
+    document.getElementById('photo-btn').style.display      = m === 'photo' ? '' : 'none';
+    document.getElementById('video-btn').style.display      = m === 'video' ? '' : 'none';
+    document.getElementById('video-play-btn').style.display = 'none';
+    document.getElementById('video-progress-wrap').style.display = 'none';
+
+    placeholder.style.display = 'flex';
+    const texts = { cam: 'INICIALIZAR CÁMARA', photo: 'SUBIR UNA FOTO', video: 'SUBIR UN VÍDEO' };
+    document.getElementById('placeholder-text').textContent = texts[m];
+
+    if (m === 'cam') fpsDisplay.parentElement.querySelector('.stat-label').textContent = 'FPS';
+    else             fpsDisplay.parentElement.querySelector('.stat-label').textContent = 'Frames';
+    setStatus('', 'OFFLINE');
+  }
+
+  /* ── CAMERA MODE ── */
+  async function startCamera() {
+    const btn = document.getElementById('cam-btn');
+    btn.disabled = true;
+    if (!await ensureModel()) { btn.disabled = false; return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      camVideo.srcObject = stream;
+      await new Promise(r => camVideo.onloadedmetadata = r);
+      placeholder.style.display = 'none';
+      overlay.width  = camVideo.videoWidth;
+      overlay.height = camVideo.videoHeight;
+      addLog('Cámara activa.');
+      setStatus('active', 'LIVE');
+      camRunning = true;
+      detectCam();
+    } catch(e) {
+      addLog('Error cámara: ' + e.message, 'warn');
+      setStatus('error', 'ERROR');
+      btn.disabled = false;
+    }
+  }
+
+  async function detectCam() {
+    if (!camRunning) return;
+    const now = performance.now();
+    frameCount++;
+    if (now - lastTime >= 1000) {
+      fpsDisplay.textContent = frameCount;
+      frameCount = 0; lastTime = now;
+    }
+    const detections = await faceapi.detectAllFaces(camVideo,
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: currentThreshold }));
+
+    // camera is mirrored via CSS, overlay must match
+    overlay.style.transform = 'scaleX(-1)';
+    overlay.width  = camVideo.videoWidth;
+    overlay.height = camVideo.videoHeight;
+    drawDetections(detections, 1, 1);
+    requestAnimationFrame(detectCam);
+  }
+
+  /* ── PHOTO MODE ── */
+  async function loadPhoto(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!await ensureModel()) return;
+
+    const url = URL.createObjectURL(file);
+    photoImg.src = url;
+    await new Promise(r => { photoImg.onload = r; });
+    placeholder.style.display = 'none';
+    overlay.style.transform = 'none';
+
+    // size overlay to match rendered image inside container
+    const container = document.getElementById('scan-container');
+    overlay.width  = container.clientWidth;
+    overlay.height = container.clientHeight;
+
+    // calculate letterbox offsets (object-fit: contain)
+    const imgAspect = photoImg.naturalWidth / photoImg.naturalHeight;
+    const boxAspect = overlay.width / overlay.height;
+    let renderW, renderH, offsetX, offsetY;
+    if (imgAspect > boxAspect) {
+      renderW = overlay.width; renderH = overlay.width / imgAspect;
+      offsetX = 0; offsetY = (overlay.height - renderH) / 2;
+    } else {
+      renderH = overlay.height; renderW = overlay.height * imgAspect;
+      offsetY = 0; offsetX = (overlay.width - renderW) / 2;
+    }
+
+    addLog('Analizando foto...');
+    setStatus('active', 'SCAN');
+
+    const detections = await faceapi.detectAllFaces(photoImg,
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: currentThreshold }));
+
+    const scaleX = renderW / photoImg.naturalWidth;
+    const scaleY = renderH / photoImg.naturalHeight;
+
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    let maxConf = 0;
+    detections.forEach(det => {
+      let { x, y, width, height } = det.box;
+      x = offsetX + x * scaleX;
+      y = offsetY + y * scaleY;
+      width  *= scaleX;
+      height *= scaleY;
+      const score = det.score;
+      if (score > maxConf) maxConf = score;
+
+      ctx.strokeStyle = '#CCFF00'; ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, width, height);
+      const cs = 16; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + width - cs, y); ctx.lineTo(x + width, y); ctx.lineTo(x + width, y + cs); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, y + height - cs); ctx.lineTo(x, y + height); ctx.lineTo(x + cs, y + height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + width - cs, y + height); ctx.lineTo(x + width, y + height); ctx.lineTo(x + width, y + height - cs); ctx.stroke();
+      ctx.fillStyle = '#CCFF00'; ctx.font = '11px "Share Tech Mono", monospace';
+      ctx.fillText('CARA ' + Math.round(score * 100) + '%', x + 4, y - 6);
+    });
+
+    faceCount.textContent = detections.length;
+    confidenceEl.textContent = maxConf > 0 ? Math.round(maxConf * 100) + '%' : '—';
+    fpsDisplay.textContent = '—';
+    addLog('Foto analizada: ' + detections.length + ' cara(s).');
+    setStatus('active', 'DONE');
+    event.target.value = '';
+  }
+
+  /* ── VIDEO MODE ── */
+  async function loadVideo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    vidPlayer.src = url;
+    await new Promise(r => { vidPlayer.onloadedmetadata = r; });
+    placeholder.style.display = 'none';
+    overlay.style.transform = 'none';
+    overlay.width  = vidPlayer.videoWidth;
+    overlay.height = vidPlayer.videoHeight;
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    faceCount.textContent = '—'; confidenceEl.textContent = '—'; fpsDisplay.textContent = '—';
+    document.getElementById('video-play-btn').style.display = '';
+    addLog('Vídeo cargado. Pulsa ANALIZAR.');
+    setStatus('', 'READY');
+    event.target.value = '';
+  }
+
+  async function runVideoDetection() {
+    if (!await ensureModel()) return;
+
+    const playBtn = document.getElementById('video-play-btn');
+    const progressWrap = document.getElementById('video-progress-wrap');
+    const progressBar  = document.getElementById('video-progress-bar');
+    const progressPct  = document.getElementById('video-progress-pct');
+
+    playBtn.disabled = true;
+    progressWrap.style.display = 'block';
+    overlay.style.transform = 'none';
+    overlay.width  = vidPlayer.videoWidth;
+    overlay.height = vidPlayer.videoHeight;
+
+    const duration = vidPlayer.duration;
+    const frameInterval = 1 / 12; // analizar 12 frames por segundo del vídeo
+    let t = 0;
+    let totalFaces = 0;
+    let analyzedFrames = 0;
+
+    addLog('Analizando vídeo...');
+    setStatus('active', 'SCAN');
+
+    while (t <= duration) {
+      vidPlayer.currentTime = t;
+      await new Promise(r => { vidPlayer.onseeked = r; });
+
+      const detections = await faceapi.detectAllFaces(vidPlayer,
+        new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: currentThreshold }));
+
+      // draw on overlay
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+      let maxConf = 0;
+      detections.forEach(det => {
+        const { x, y, width, height } = det.box;
+        const score = det.score;
+        if (score > maxConf) maxConf = score;
+        ctx.strokeStyle = '#CCFF00'; ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, width, height);
+        const cs = 12; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + width - cs, y); ctx.lineTo(x + width, y); ctx.lineTo(x + width, y + cs); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, y + height - cs); ctx.lineTo(x, y + height); ctx.lineTo(x + cs, y + height); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + width - cs, y + height); ctx.lineTo(x + width, y + height); ctx.lineTo(x + width, y + height - cs); ctx.stroke();
+        ctx.fillStyle = '#CCFF00'; ctx.font = '10px "Share Tech Mono", monospace';
+        ctx.fillText(Math.round(score * 100) + '%', x + 2, y - 4);
+      });
+
+      if (detections.length > 0) totalFaces = Math.max(totalFaces, detections.length);
+      faceCount.textContent = detections.length;
+      confidenceEl.textContent = maxConf > 0 ? Math.round(maxConf * 100) + '%' : '—';
+
+      analyzedFrames++;
+      fpsDisplay.textContent = analyzedFrames;
+
+      const pct = Math.min(100, Math.round((t / duration) * 100));
+      progressBar.style.width = pct + '%';
+      progressPct.textContent = pct + '%';
+
+      t += frameInterval;
+      await new Promise(r => setTimeout(r, 0)); // yield al navegador
+    }
+
+    progressBar.style.width = '100%';
+    progressPct.textContent = '100%';
+    addLog('Vídeo completo. Máx ' + totalFaces + ' cara(s) simultáneas.');
+    setStatus('active', 'DONE');
+    playBtn.disabled = false;
+  }
+</script>
+</body>
+</html>
